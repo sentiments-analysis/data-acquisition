@@ -1,10 +1,12 @@
 import os
-from typing import List
+from typing import Dict, List
 import praw 
 from praw.models import Submission
 from praw.models import MoreComments
 from praw.models import Comment
 from  praw.models.comment_forest import CommentForest
+from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 
 SUBREDDIT = "formula1"
 
@@ -61,22 +63,46 @@ def main():
         post = {
             "id": submission.id,
             "title": submission.title,
-            "author": submission.author,
-            "comments": get_all_comments(submission),
+            "author_id": submission.author.id,
+            "comments": ['formule', 'rien'],
+           # "comments": get_all_comments(submission),
             "url": submission.url
         }
         all_posts.append(post)
     
 
     titles = [post["title"] for post in all_posts]
-    for title in titles:
-        print(title)
+    write_to_db(all_posts)
         
         
-def write_to_db(posts):
-    pass
+def write_to_db(posts: List[Dict]):
+    print(posts)
+    client = bigquery.Client()
+    dataset_id = 'data'
+    table_id = 'posts'
+    full_table_id = f"{client.project}.{dataset_id}.{table_id}"
+    schema = [
+    bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("title", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("author_id", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("comments",  "STRING", mode="REPEATED"),
+    bigquery.SchemaField("url", "STRING", mode="REQUIRED")]
+    table = bigquery.Table(full_table_id, schema=schema)
 
-main()
+    try:
+        client.get_table(table)  
+        print(f"Table {table_id} already exists.")
+    except NotFound:
+        table = client.create_table(table)  
+        print(f"Created table {table_id}.")
+
+    errors = client.insert_rows_json(table, posts)
+    if errors == []:
+        print("New rows have been added.")
+    else:
+        print("Errors occurred while inserting rows: ", errors)
+
+main() 
 
 
 
