@@ -8,7 +8,7 @@ from  praw.models.comment_forest import CommentForest
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-SUBREDDIT = "formula1"
+REDDIT = ["formula1","news", "horror"]
 
 
 user_agent = "Scrapper 1.0 by /u/Reasonable-Fold-8491"
@@ -56,24 +56,25 @@ def get_all_comments(post: Submission) -> List[str]:
 
 def main():
     all_posts = []
-    
-    submissions = get_data(SUBREDDIT, 10)
-    
-    for submission in submissions:
-        post = {
-            "id": submission.id,
-            "title": submission.title,
-            "author_id": submission.author.id,
-            "comments": ['formule', 'rien'],
-           # "comments": get_all_comments(submission),
-            "url": submission.url
-        }
-        all_posts.append(post)
-    
+    for SUBREDDIT in REDDIT:
 
-    titles = [post["title"] for post in all_posts]
-    write_to_db(all_posts)
+        submissions = get_data(SUBREDDIT, 10)
         
+        for submission in submissions:
+            post = {
+                "reddit": SUBREDDIT,
+                "id": submission.id,
+                "title": submission.title,
+                "author_id": submission.author.id,
+                "comments": get_all_comments(submission),
+                "url": submission.url
+            }
+            all_posts.append(post)
+        
+
+        titles = [post["title"] for post in all_posts]
+        write_to_db(all_posts)
+            
         
 def write_to_db(posts: List[Dict]):
     print(posts)
@@ -82,6 +83,7 @@ def write_to_db(posts: List[Dict]):
     table_id = 'posts'
     full_table_id = f"{client.project}.{dataset_id}.{table_id}"
     schema = [
+    bigquery.SchemaField("reddit", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("title", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("author_id", "STRING", mode="REQUIRED"),
@@ -103,6 +105,3 @@ def write_to_db(posts: List[Dict]):
         print("Errors occurred while inserting rows: ", errors)
 
 main() 
-
-
-
